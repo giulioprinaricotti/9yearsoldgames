@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Clicker Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            overflow: hidden;
+        }
+        
+        #gameArea {
+            width: 100vw;
+            height: 80vh;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            margin: 0 auto;
+        }
+        
+        #score {
+            font-size: 2em;
+            color: #333;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+        }
+        
+        #robot {
+            width: 80px;
+            height: 80px;
+            background: #ff4757;
+            border-radius: 10px;
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.1s;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        #robot:before {
+            content: '🏎️';
+            font-size: 50px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        #robot:hover {
+            transform: scale(1.1);
+        }
+        
+        #robot:active {
+            transform: scale(0.9);
+        }
+        
+        .points {
+            position: absolute;
+            font-size: 2em;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            animation: float 1s ease-out forwards;
+        }
+        
+        @keyframes float {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            pointer-events: none;
+            border-radius: 50%;
+            animation: confettiDrop 1s ease-out forwards;
+        }
+        
+        @keyframes confettiDrop {
+            0% {
+                opacity: 1;
+                transform: translateY(0) rotate(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(100px) rotate(720deg);
+            }
+        }
+        
+        .caught-cat {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: #4ecdc4;
+            border-radius: 10px;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            animation: catchAnimation 0.8s ease-out forwards;
+            pointer-events: none;
+        }
+        
+        .caught-cat:before {
+            content: '🏎️';
+            font-size: 50px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        @keyframes catchAnimation {
+            0% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+            50% {
+                transform: scale(1.3) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.5) rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <div id="gameArea">
+        <div id="robot"></div>
+    </div>
+
+    <script>
+        let score = 0;
+        const robot = document.getElementById('robot');
+        const gameArea = document.getElementById('gameArea');
+        const scoreDisplay = document.getElementById('score');
+        
+        function moveRobot() {
+            const maxX = gameArea.offsetWidth - 80;
+            const maxY = gameArea.offsetHeight - 80;
+            
+            const x = Math.random() * maxX;
+            const y = Math.random() * maxY;
+            
+            robot.style.left = x + 'px';
+            robot.style.top = y + 'px';
+            
+            const colors = ['#ff4757', '#2ed573', '#ffa502', '#3742fa', '#ff6348', '#a4b0be'];
+            robot.style.background = colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        function showPoints(x, y) {
+            const pointsEl = document.createElement('div');
+            pointsEl.className = 'points';
+            pointsEl.textContent = '+1';
+            pointsEl.style.left = x + 'px';
+            pointsEl.style.top = y + 'px';
+            gameArea.appendChild(pointsEl);
+            
+            setTimeout(() => pointsEl.remove(), 1000);
+        }
+        
+        function showConfetti(x, y) {
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#ff4757', '#2ed573', '#ffa502', '#3742fa'];
+            
+            for (let i = 0; i < 15; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = (x + Math.random() * 40 - 20) + 'px';
+                confetti.style.top = (y + Math.random() * 40 - 20) + 'px';
+                
+                gameArea.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 1000);
+            }
+        }
+        
+        robot.addEventListener('click', (e) => {
+            score++;
+            scoreDisplay.textContent = 'Score: ' + score;
+            
+            const rect = gameArea.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // Create caught cat animation
+            const caughtCat = document.createElement('div');
+            caughtCat.className = 'caught-cat';
+            caughtCat.style.left = robot.style.left;
+            caughtCat.style.top = robot.style.top;
+            gameArea.appendChild(caughtCat);
+            
+            showPoints(clickX, clickY);
+            showConfetti(clickX, clickY);
+            
+            // Remove the caught cat after animation
+            setTimeout(() => caughtCat.remove(), 800);
+            
+            moveRobot();
+        });
+        
+        moveRobot();
+        setInterval(moveRobot, 2000);
+    </script>
+</body>
+</html>

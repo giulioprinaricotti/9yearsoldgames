@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Runner Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #2d4a22;
+            border: 4px solid #8B4513;
+        }
+        
+        #gameArea {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Garden Level */
+        .level-garden {
+            background: linear-gradient(45deg, #2d4a22 25%, transparent 25%), 
+                       linear-gradient(-45deg, #2d4a22 25%, transparent 25%), 
+                       linear-gradient(45deg, transparent 75%, #2d4a22 75%), 
+                       linear-gradient(-45deg, transparent 75%, #2d4a22 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        
+        /* First Floor */
+        .level-floor1 {
+            background: #8B4513;
+            background-image: 
+                repeating-linear-gradient(90deg, transparent, transparent 50px, #654321 50px, #654321 52px);
+        }
+        
+        /* Second Floor */
+        .level-floor2 {
+            background: #654321;
+            background-image: 
+                repeating-linear-gradient(0deg, transparent, transparent 40px, #4a2c17 40px, #4a2c17 42px);
+        }
+        
+        .wall {
+            position: absolute;
+            background: #333;
+            border: 2px solid #555;
+        }
+        
+        .door {
+            position: absolute;
+            background: #8B4513;
+            border: 2px solid #654321;
+        }
+        
+        .stairs {
+            position: absolute;
+            background: #666;
+            border: 2px solid #888;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+        }
+        
+        #player {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #4A90E2;
+            border: 3px solid #2E5C8A;
+            border-radius: 50%;
+            transition: all 0.1s;
+            z-index: 100;
+        }
+        
+        #player::before {
+            content: '🏃';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+        
+        .ghost {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            font-size: 20px;
+            animation: ghostFloat 2s ease-in-out infinite;
+            z-index: 50;
+        }
+        
+        @keyframes ghostFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            z-index: 200;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #levelIndicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            z-index: 200;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-size: 12px;
+            z-index: 200;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        
+        .caught-effect {
+            position: absolute;
+            font-size: 30px;
+            color: #FFD700;
+            animation: catchEffect 1s ease-out forwards;
+            z-index: 150;
+            pointer-events: none;
+        }
+        
+        @keyframes catchEffect {
+            0% { opacity: 1; transform: scale(0.5); }
+            50% { transform: scale(1.2); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="gameArea" class="level-garden">
+            <div id="player"></div>
+        </div>
+        
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>Ghosts: <span id="ghostCount">0</span></div>
+        </div>
+        
+        <div id="levelIndicator">
+            <div>Level: <span id="currentLevel">Garden</span></div>
+        </div>
+        
+        <div id="instructions">
+            Use Arrow Keys to move • Walk into ghosts to catch them • Find stairs to change levels
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        let ghostsCaught = 0;
+        let currentLevel = 'garden';
+        let playerSpeed = 4;
+        
+        const player = document.getElementById('player');
+        const gameArea = document.getElementById('gameArea');
+        
+        let playerPos = { x: 50, y: 50 };
+        let keys = {};
+        let ghosts = [];
+        let walls = [];
+        let stairs = [];
+        
+        const levels = {
+            garden: {
+                name: 'Garden',
+                className: 'level-garden',
+                walls: [
+                    // Outer walls
+                    { x: 0, y: 0, width: 800, height: 20 },           // Top
+                    { x: 0, y: 580, width: 800, height: 20 },         // Bottom
+                    { x: 0, y: 0, width: 20, height: 600 },           // Left
+                    { x: 780, y: 0, width: 20, height: 600 },         // Right
+                    // House structure - walls around house with door opening
+                    { x: 300, y: 200, width: 200, height: 20 },       // Top wall
+                    { x: 300, y: 200, width: 20, height: 200 },       // Left wall
+                    { x: 480, y: 200, width: 20, height: 200 },       // Right wall
+                    { x: 300, y: 380, width: 50, height: 20 },        // Bottom left
+                    { x: 450, y: 380, width: 50, height: 20 },        // Bottom right
+                ],
+                stairs: [
+                    { x: 350, y: 420, width: 50, height: 20, to: 'floor1', text: '↑' }
+                ],
+                ghostSpawns: [
+                    { x: 50, y: 50 }, { x: 150, y: 50 }, { x: 250, y: 50 }, { x: 550, y: 50 }, { x: 650, y: 50 }, { x: 750, y: 50 },
+                    { x: 50, y: 150 }, { x: 150, y: 150 }, { x: 250, y: 150 }, { x: 550, y: 150 }, { x: 650, y: 150 }, { x: 750, y: 150 },
+                    { x: 50, y: 300 }, { x: 150, y: 300 }, { x: 250, y: 300 }, { x: 350, y: 300 }, { x: 450, y: 300 }, { x: 550, y: 300 }, { x: 650, y: 300 },
+                    { x: 50, y: 450 }, { x: 150, y: 450 }, { x: 550, y: 450 }, { x: 650, y: 450 }, { x: 750, y: 450 },
+                    { x: 400, y: 250 }
+                ]
+            },
+            floor1: {
+                name: 'First Floor',
+                className: 'level-floor1',
+                walls: [
+                    // Outer walls
+                    { x: 0, y: 0, width: 800, height: 20 },
+                    { x: 0, y: 580, width: 800, height: 20 },
+                    { x: 0, y: 0, width: 20, height: 600 },
+                    { x: 780, y: 0, width: 20, height: 600 },
+                    // Rooms
+                    { x: 200, y: 100, width: 20, height: 200 },       // Room divider 1
+                    { x: 400, y: 100, width: 20, height: 200 },       // Room divider 2
+                    { x: 600, y: 100, width: 20, height: 200 },       // Room divider 3
+                    { x: 200, y: 350, width: 400, height: 20 },       // Hallway divider
+                ],
+                stairs: [
+                    { x: 350, y: 20, width: 50, height: 20, to: 'floor2', text: '↑' },
+                    { x: 350, y: 560, width: 50, height: 20, to: 'garden', text: '↓' }
+                ],
+                ghostSpawns: [
+                    { x: 50, y: 50 }, { x: 100, y: 50 }, { x: 150, y: 50 }, { x: 250, y: 50 }, { x: 300, y: 50 },
+                    { x: 450, y: 50 }, { x: 500, y: 50 }, { x: 650, y: 50 }, { x: 700, y: 50 }, { x: 750, y: 50 },
+                    { x: 50, y: 150 }, { x: 100, y: 150 }, { x: 250, y: 150 }, { x: 300, y: 150 }, { x: 450, y: 150 },
+                    { x: 500, y: 150 }, { x: 650, y: 150 }, { x: 700, y: 150 }, { x: 750, y: 150 }, { x: 50, y: 450 },
+                    { x: 150, y: 450 }, { x: 300, y: 450 }, { x: 500, y: 450 }, { x: 650, y: 450 }, { x: 750, y: 450 }
+                ]
+            },
+            floor2: {
+                name: 'Second Floor',
+                className: 'level-floor2',
+                walls: [
+                    // Outer walls
+                    { x: 0, y: 0, width: 800, height: 20 },
+                    { x: 0, y: 580, width: 800, height: 20 },
+                    { x: 0, y: 0, width: 20, height: 600 },
+                    { x: 780, y: 0, width: 20, height: 600 },
+                    // Attic layout
+                    { x: 300, y: 200, width: 200, height: 20 },       // Central beam
+                    { x: 150, y: 300, width: 500, height: 20 },       // Long beam
+                ],
+                stairs: [
+                    { x: 350, y: 560, width: 50, height: 20, to: 'floor1', text: '↓' }
+                ],
+                ghostSpawns: [
+                    { x: 50, y: 50 }, { x: 150, y: 50 }, { x: 250, y: 50 }, { x: 350, y: 50 }, { x: 450, y: 50 },
+                    { x: 550, y: 50 }, { x: 650, y: 50 }, { x: 750, y: 50 }, { x: 50, y: 150 }, { x: 150, y: 150 },
+                    { x: 250, y: 150 }, { x: 550, y: 150 }, { x: 650, y: 150 }, { x: 750, y: 150 }, { x: 50, y: 250 },
+                    { x: 100, y: 250 }, { x: 200, y: 250 }, { x: 600, y: 250 }, { x: 700, y: 250 }, { x: 750, y: 250 },
+                    { x: 200, y: 400 }, { x: 300, y: 400 }, { x: 500, y: 400 }, { x: 600, y: 400 }, { x: 400, y: 500 }
+                ]
+            }
+        };
+        
+        function loadLevel(levelName) {
+            currentLevel = levelName;
+            const level = levels[levelName];
+            
+            // Clear existing elements
+            walls = [];
+            stairs = [];
+            ghosts.forEach(ghost => ghost.element.remove());
+            ghosts = [];
+            document.querySelectorAll('.wall, .stairs').forEach(el => el.remove());
+            
+            // Update visual
+            gameArea.className = level.className;
+            document.getElementById('currentLevel').textContent = level.name;
+            
+            // Create walls
+            level.walls.forEach(wallData => {
+                const wall = document.createElement('div');
+                wall.className = 'wall';
+                wall.style.left = wallData.x + 'px';
+                wall.style.top = wallData.y + 'px';
+                wall.style.width = wallData.width + 'px';
+                wall.style.height = wallData.height + 'px';
+                gameArea.appendChild(wall);
+                walls.push(wallData);
+            });
+            
+            // Create stairs
+            level.stairs.forEach(stairData => {
+                const stair = document.createElement('div');
+                stair.className = 'stairs';
+                stair.style.left = stairData.x + 'px';
+                stair.style.top = stairData.y + 'px';
+                stair.style.width = stairData.width + 'px';
+                stair.style.height = stairData.height + 'px';
+                stair.textContent = stairData.text;
+                gameArea.appendChild(stair);
+                stairs.push(stairData);
+            });
+            
+            // Spawn ghosts
+            level.ghostSpawns.forEach(spawn => {
+                createGhost(spawn.x, spawn.y);
+            });
+            
+            // Reset player position
+            if (levelName === 'garden') {
+                playerPos = { x: 50, y: 50 };
+            } else if (levelName === 'floor1') {
+                playerPos = { x: 375, y: 500 };
+            } else if (levelName === 'floor2') {
+                playerPos = { x: 375, y: 500 };
+            }
+            updatePlayerPosition();
+        }
+        
+        function createGhost(x, y) {
+            const ghostElement = document.createElement('div');
+            ghostElement.className = 'ghost';
+            ghostElement.style.left = x + 'px';
+            ghostElement.style.top = y + 'px';
+            ghostElement.textContent = '👻';
+            gameArea.appendChild(ghostElement);
+            
+            const ghost = {
+                element: ghostElement,
+                x: x,
+                y: y,
+                dx: (Math.random() - 0.5) * 2,
+                dy: (Math.random() - 0.5) * 2
+            };
+            
+            ghosts.push(ghost);
+        }
+        
+        function updatePlayerPosition() {
+            player.style.left = playerPos.x + 'px';
+            player.style.top = playerPos.y + 'px';
+        }
+        
+        function checkCollision(x, y, width = 30, height = 30) {
+            for (let wall of walls) {
+                if (x < wall.x + wall.width &&
+                    x + width > wall.x &&
+                    y < wall.y + wall.height &&
+                    y + height > wall.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function checkStairs() {
+            for (let stair of stairs) {
+                if (playerPos.x < stair.x + stair.width &&
+                    playerPos.x + 30 > stair.x &&
+                    playerPos.y < stair.y + stair.height &&
+                    playerPos.y + 30 > stair.y) {
+                    loadLevel(stair.to);
+                    return;
+                }
+            }
+        }
+        
+        function checkGhostCollision() {
+            ghosts.forEach((ghost, index) => {
+                const distance = Math.sqrt(
+                    Math.pow(playerPos.x - ghost.x, 2) + 
+                    Math.pow(playerPos.y - ghost.y, 2)
+                );
+                
+                if (distance < 25) {
+                    // Caught a ghost!
+                    score += 10;
+                    ghostsCaught++;
+                    document.getElementById('score').textContent = score;
+                    document.getElementById('ghostCount').textContent = ghostsCaught;
+                    
+                    // Show effect
+                    const effect = document.createElement('div');
+                    effect.className = 'caught-effect';
+                    effect.textContent = '✨+10✨';
+                    effect.style.left = ghost.x + 'px';
+                    effect.style.top = ghost.y + 'px';
+                    gameArea.appendChild(effect);
+                    
+                    setTimeout(() => effect.remove(), 1000);
+                    
+                    // Remove ghost
+                    ghost.element.remove();
+                    ghosts.splice(index, 1);
+                }
+            });
+        }
+        
+        function moveGhosts() {
+            ghosts.forEach(ghost => {
+                ghost.x += ghost.dx;
+                ghost.y += ghost.dy;
+                
+                // Bounce off walls
+                if (ghost.x <= 25 || ghost.x >= 750) ghost.dx *= -1;
+                if (ghost.y <= 25 || ghost.y >= 550) ghost.dy *= -1;
+                
+                ghost.element.style.left = ghost.x + 'px';
+                ghost.element.style.top = ghost.y + 'px';
+            });
+        }
+        
+        function gameLoop() {
+            // Move player
+            let newX = playerPos.x;
+            let newY = playerPos.y;
+            
+            if (keys['ArrowUp']) newY -= playerSpeed;
+            if (keys['ArrowDown']) newY += playerSpeed;
+            if (keys['ArrowLeft']) newX -= playerSpeed;
+            if (keys['ArrowRight']) newX += playerSpeed;
+            
+            // Check boundaries and collisions
+            if (newX >= 20 && newX <= 750 && !checkCollision(newX, playerPos.y)) {
+                playerPos.x = newX;
+            }
+            if (newY >= 20 && newY <= 550 && !checkCollision(playerPos.x, newY)) {
+                playerPos.y = newY;
+            }
+            
+            updatePlayerPosition();
+            checkStairs();
+            checkGhostCollision();
+            moveGhosts();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // Start game
+        loadLevel('garden');
+        gameLoop();
+    </script>
+</body>
+</html>
