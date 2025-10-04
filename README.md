@@ -1,6 +1,6 @@
 # 👻 Ghost Games Collection
 
-A collection of fun, educational ghost hunting games created during a coding session with 4th grade students at St. Francis International School in Rome, 2025.
+A collection of fun, educational ghost hunting games created during a coding session with 4th grade students in 2025.
 
 ## 🎮 Games Included
 
@@ -51,7 +51,7 @@ These games were designed to:
 
 ## 🏫 About
 
-Created during a collaborative coding session with the talented 4th grade students at **St. Francis International School, Rome** in **2025**. The games progress from simple clicking mechanics to complex 3D navigation, allowing students to experience different levels of interactive media.
+Created during a collaborative coding session with talented 4th grade students in **2025**. The games progress from simple clicking mechanics to complex 3D navigation, allowing students to experience different levels of interactive media.
 
 ## 🛠 Technical Details
 
